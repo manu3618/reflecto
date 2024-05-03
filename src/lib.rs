@@ -67,7 +67,9 @@ impl MirrorList {
     /// Sort mirrors by sortkey
     pub fn sort(&mut self, by: SortKey) {
         match by {
-            SortKey::Age => todo!(),
+            SortKey::Age => self
+                .mirrors
+                .sort_by_key(|m| m.last_sync.unwrap_or_default()),
             SortKey::Rate => todo!(),
             SortKey::Country => self
                 .mirrors
@@ -259,5 +261,19 @@ mod tests {
             "https://mirror.aarnet.edu.au/pub/archlinux/"
         );
         assert_eq!(ml.mirrors[2].url, "https://mirrors.rutgers.edu/archlinux/");
+    }
+
+    #[test]
+    fn sort_age() {
+        let j = format!("{{\"urls\":[{MIRROR0},{MIRROR1},{MIRROR2}]}}");
+        let mut ml: MirrorList = serde_json::from_str(&j).unwrap();
+        ml.sort(SortKey::Age);
+        assert_eq!(ml.mirrors[0].url, "https://mirrors.rutgers.edu/archlinux/"); // null
+        assert_eq!(
+            ml.mirrors[1].url,
+            "https://mirror.aarnet.edu.au/pub/archlinux/"
+        ); // 2024-04
+        assert_eq!(ml.mirrors[2].url, "http://ftp.ntua.gr/pub/linux/archlinux/");
+        // 2024-05
     }
 }
