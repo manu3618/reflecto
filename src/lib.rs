@@ -68,7 +68,9 @@ impl MirrorList {
         match by {
             SortKey::Age => todo!(),
             SortKey::Rate => todo!(),
-            SortKey::Country => todo!(),
+            SortKey::Country => self
+                .mirrors
+                .sort_by_key(|m| m.country.clone().unwrap_or_default()),
             SortKey::Score => self
                 .mirrors
                 .sort_by_key(|m| m.score.unwrap_or(f64::INFINITY).round() as i32),
@@ -120,6 +122,7 @@ struct Mirror {
     protocol: Protocol,
     score: Option<f64>,
     delay: Option<f64>,
+    country: Option<String>,
 
     #[serde(default)]
     #[serde(with = "parse_date")]
