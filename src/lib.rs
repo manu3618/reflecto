@@ -1,6 +1,7 @@
 use anyhow::Result;
 use chrono::DateTime;
 use chrono::Utc;
+use clap::ValueEnum;
 use serde::Deserialize;
 use std::fmt;
 use std::fs::File;
@@ -9,8 +10,8 @@ use std::path::Path;
 
 static MIRROR_STATUS_URL: &str = "https://archlinux.org/mirrors/status/json";
 
-#[derive(Debug)]
-enum SortKey {
+#[derive(Debug, Clone, ValueEnum)]
+pub enum SortKey {
     /// Last server syncrhonisation
     Age,
     /// Download rate
@@ -63,7 +64,7 @@ impl MirrorList {
     }
 
     /// Sort mirrors by sortkey
-    fn sort(&mut self, by: SortKey) {
+    pub fn sort(&mut self, by: SortKey) {
         match by {
             SortKey::Age => todo!(),
             SortKey::Rate => todo!(),

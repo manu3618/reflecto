@@ -4,12 +4,15 @@ use clap::Parser;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
+    #[arg(short, long, default_value_t=reflecto::SortKey::Score)]
+    sort: reflecto::SortKey,
     #[arg(short, long, default_value_t=usize::MAX)]
     number: usize,
 }
 
 fn main() {
     let args = Args::parse();
-    let mlist = reflecto::MirrorList::from_default_url().unwrap();
+    let mut mlist = reflecto::MirrorList::from_default_url().unwrap();
+    mlist.sort(args.sort);
     println!("{}", mlist.to_file_content(args.number));
 }
