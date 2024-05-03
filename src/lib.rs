@@ -118,7 +118,7 @@ impl MirrorList {
     }
 
     /// get a list of all countries in which a mirror is present
-    fn get_countries(&self) -> HashSet<String> {
+    pub fn get_countries(&self) -> HashSet<String> {
         self.mirrors
             .iter()
             .filter_map(|m| m.country.clone())
