@@ -7,19 +7,21 @@ use std::io::Write;
 use std::path::Path;
 
 static MIRROR_STATUS_URL: &str = "https://archlinux.org/mirrors/status/json";
+
 #[derive(Debug)]
 enum SortKey {
     /// Last server syncrhonisation
     Age,
-    /// Download reate
+    /// Download rate
     Rate,
     /// Country name, alphabetically
     Country,
-    /// Mirror status score
+    /// Mirror status score. The lower, the better
     Score,
     /// Mirror status delay
     Delay,
 }
+
 #[derive(Debug, Default, Deserialize)]
 pub struct MirrorList {
     #[serde(rename = "urls")]
@@ -53,7 +55,9 @@ impl MirrorList {
             SortKey::Age => todo!(),
             SortKey::Rate => todo!(),
             SortKey::Country => todo!(),
-            SortKey::Score => todo!(),
+            SortKey::Score => self
+                .mirrors
+                .sort_by_key(|m| m.score.unwrap_or(f64::INFINITY).round() as i32),
             SortKey::Delay => self
                 .mirrors
                 .sort_by_key(|m| m.delay.unwrap_or(f64::INFINITY).round() as i32),
