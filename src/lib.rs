@@ -4,7 +4,7 @@ use chrono::Duration;
 use chrono::Utc;
 use clap::ValueEnum;
 use serde::Deserialize;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::fmt;
 use std::fs::File;
 use std::io::Write;
@@ -119,12 +119,50 @@ impl MirrorList {
     }
 
     /// get a list of all countries in which a mirror is present
-    pub fn get_countries(&self) -> HashSet<String> {
-        self.mirrors
-            .iter()
-            .filter_map(|m| m.country.clone())
-            .collect()
+    /// returns a Hashmap<(Country, Code), Count>
+    fn get_countries(&self) -> HashMap<(String, String), usize> {
+        let mut countries = HashMap::new();
+        for mirror in self.mirrors.iter() {
+            if mirror.country.is_none() || mirror.country_code.is_none() {
+                continue;
+            }
+            let key = (
+                mirror.country.clone().unwrap(),
+                mirror.country_code.clone().unwrap(),
+            );
+            *countries.entry(key).or_insert(0) += 1;
+        }
+        countries
     }
+
+    /// get a csv-like string listing countries
+    pub fn print_countries(&self) -> String {
+        let mut lines = Vec::new();
+        let mut countries = self.get_countries().into_iter().collect::<Vec<_>>();
+        countries.sort();
+        let longuest = countries
+            .iter()
+            .map(|c| c.0 .0.chars().count())
+            .max()
+            .expect("at least one country");
+        let longuest = longuest.max(7); // minimal value: length of "Country"
+        lines.push(format!("Country{} Code Count", " ".repeat(longuest - 7)));
+        lines.push(format!("{} ---- ----", "-".repeat(longuest)));
+        for c in countries {
+            if c.0 .0 == "" {
+                continue;
+            }
+            lines.push(get_country_line(&c.0 .0, &c.0 .1, c.1, longuest));
+        }
+        lines.join("\n")
+    }
+}
+
+fn get_country_line(country: &str, code: &str, count: usize, country_len: usize) -> String {
+    debug_assert!(country_len >= country.chars().count());
+    let padding = " ".repeat(country_len - country.chars().count());
+    debug_assert!(code.len() == 2);
+    format!("{}{} {: >4} {: >4}", country, padding, code, count).into()
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -135,6 +173,7 @@ struct Mirror {
     score: Option<f64>,
     delay: Option<f64>,
     country: Option<String>,
+    country_code: Option<String>,
 
     #[serde(default)]
     #[serde(with = "parse_date")]
@@ -188,9 +227,6 @@ enum Protocol {
     Http,
     Rsync,
 }
-
-#[derive(Debug)]
-enum Country {}
 
 #[cfg(test)]
 mod tests {

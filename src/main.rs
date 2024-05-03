@@ -29,15 +29,7 @@ fn main() {
     let args = Args::parse();
     let mut mlist = reflecto::MirrorList::from_url(&args.url).unwrap();
     if args.list_countries {
-        println!(
-            "{}",
-            mlist
-                .get_countries()
-                .iter()
-                .cloned()
-                .collect::<Vec<_>>()
-                .join("\n")
-        );
+        println!("{}", mlist.print_countries());
         return;
     }
     mlist.sort(args.sort);
