@@ -2,6 +2,7 @@ use anyhow::Result;
 use chrono::DateTime;
 use chrono::Utc;
 use serde::Deserialize;
+use std::fmt;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
@@ -20,6 +21,18 @@ enum SortKey {
     Score,
     /// Mirror status delay
     Delay,
+}
+
+impl fmt::Display for SortKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SortKey::Age => write!(f, "age"),
+            SortKey::Rate => write!(f, "rate"),
+            SortKey::Country => write!(f, "country"),
+            SortKey::Score => write!(f, "score"),
+            SortKey::Delay => write!(f, "delay"),
+        }
+    }
 }
 
 #[derive(Debug, Default, Deserialize)]
