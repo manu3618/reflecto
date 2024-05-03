@@ -61,9 +61,9 @@ impl MirrorList {
     }
 
     /// return the content to put in mirrorlist
-    pub fn to_file_content(&self) -> String {
+    pub fn to_file_content(&self, number: usize) -> String {
         let mut lines = vec![self.file_preambule(), "".into()];
-        lines.push(self.server_list(usize::MAX)); // TODO: add limit
+        lines.push(self.server_list(number));
         lines.join("\n")
     }
 
