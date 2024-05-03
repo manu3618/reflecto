@@ -6,6 +6,10 @@ use clap::Parser;
 struct Args {
     #[arg(long, action)]
     list_countries: bool,
+
+    #[arg(long, default_value_t=reflecto::MIRROR_STATUS_URL.into())]
+    /// The URL from which to retrieve the mirror date in JSON format
+    url: String,
     #[arg(short, long, default_value_t=reflecto::SortKey::Score)]
     sort: reflecto::SortKey,
     #[arg(short, long, default_value_t=usize::MAX)]
@@ -14,7 +18,7 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    let mut mlist = reflecto::MirrorList::from_default_url().unwrap();
+    let mut mlist = reflecto::MirrorList::from_url(&args.url).unwrap();
     if args.list_countries {
         println!(
             "{}",

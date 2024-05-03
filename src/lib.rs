@@ -9,7 +9,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 
-static MIRROR_STATUS_URL: &str = "https://archlinux.org/mirrors/status/json";
+pub static MIRROR_STATUS_URL: &str = "https://archlinux.org/mirrors/status/json";
 
 #[derive(Debug, Clone, ValueEnum)]
 pub enum SortKey {
@@ -51,7 +51,7 @@ impl MirrorList {
         Self::from_url(MIRROR_STATUS_URL)
     }
 
-    fn from_url(url: &str) -> Result<Self> {
+    pub fn from_url(url: &str) -> Result<Self> {
         let body = reqwest::blocking::get(url)?.text()?;
         // XXX
         let mut file = File::create(Path::new("/tmp/json.json"))?;
