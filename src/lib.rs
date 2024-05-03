@@ -1,5 +1,6 @@
 use anyhow::Result;
 use chrono::DateTime;
+use chrono::Duration;
 use chrono::Utc;
 use clap::ValueEnum;
 use serde::Deserialize;
@@ -167,6 +168,15 @@ mod parse_date {
 impl Mirror {
     /// Update delay based on ping time.
     fn update_delay(&mut self) {}
+
+    /// Compute mirror age based on last server synchronisation
+    fn age(&self) -> Option<Duration> {
+        if let Some(last_sync) = self.last_sync {
+            Some(Utc::now() - last_sync)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Default, Deserialize)]
