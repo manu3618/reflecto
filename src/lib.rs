@@ -7,10 +7,23 @@ use std::io::Write;
 use std::path::Path;
 
 static MIRROR_STATUS_URL: &str = "https://archlinux.org/mirrors/status/json";
-
+#[derive(Debug)]
+enum SortKey {
+    /// Last server syncrhonisation
+    Age,
+    /// Download reate
+    Rate,
+    /// Country name, alphabetically
+    Country,
+    /// Mirror status score
+    Score,
+    /// Mirror status delay
+    Delay,
+}
 #[derive(Debug, Default, Deserialize)]
 pub struct MirrorList {
-    urls: Vec<Mirror>,
+    #[serde(rename = "urls")]
+    mirrors: Vec<Mirror>,
 }
 
 impl MirrorList {
@@ -27,6 +40,19 @@ impl MirrorList {
 
         let mlist: Self = serde_json::from_str(&body).expect(&format!("malformed JSON: {}", &body));
         Ok(mlist)
+    }
+
+    /// Sort mirrors by sortkey
+    fn sort(&mut self, by: SortKey) {
+        match by {
+            SortKey::Age => todo!(),
+            SortKey::Rate => todo!(),
+            SortKey::Country => todo!(),
+            SortKey::Score => todo!(),
+            SortKey::Delay => self
+                .mirrors
+                .sort_by_key(|m| m.delay.unwrap_or(f64::INFINITY).round() as i32),
+        }
     }
 }
 
@@ -125,6 +151,24 @@ mod tests {
                  "ipv6": true,
                  "details": "https://archlinux.org/mirrors/ntua.gr/333/"
              }"#;
+    static MIRROR2: &str = r#"
+            {
+                "url": "https://mirror.aarnet.edu.au/pub/archlinux/",
+                "protocol": "https",
+                "last_sync": "2024-04-01T08:22:54Z",
+                "completion_pct": 1.0,
+                "delay": 1863,
+                "duration_avg": 1.1129106909958357,
+                "duration_stddev": 0.23354254068513589,
+                "score": 1.8639532316809715,
+                "active": true,
+                "country": "Australia",
+                "country_code": "AU",
+                "isos": true,
+                "ipv4": true,
+                "ipv6": true,
+                "details": "https://archlinux.org/mirrors/aarnet.edu.au/5/"
+            }"#;
 
     #[test]
     fn mirror0() {
@@ -134,5 +178,17 @@ mod tests {
     #[test]
     fn mirror1() {
         let _: Mirror = serde_json::from_str(MIRROR1).unwrap();
+    }
+
+    #[test]
+    fn sort_delay() {
+        let j = format!("{{\"urls\":[{MIRROR0},{MIRROR1},{MIRROR2}]}}");
+        let mut ml: MirrorList = serde_json::from_str(&j).unwrap();
+        ml.sort(SortKey::Delay);
+        assert_eq!(
+            ml.mirrors[0].url,
+            "https://mirror.aarnet.edu.au/pub/archlinux/"
+        );
+        assert_eq!(ml.mirrors[2].url, "https://mirrors.rutgers.edu/archlinux/");
     }
 }
