@@ -1,6 +1,4 @@
 fn main() {
-    println!("Hello, world!");
-    let _mlist = reflecto::MirrorList::from_default_url();
-
-    println!("url: https://archlinux.org/mirrors/status/json");
+    let mlist = reflecto::MirrorList::from_default_url().unwrap();
+    println!("{}", mlist.to_file_content());
 }
