@@ -8,6 +8,7 @@ use std::path::PathBuf;
 #[command(version, about, long_about = None)]
 struct Args {
     #[arg(long, action)]
+    ///  Display a table of the distribution of server by country
     list_countries: bool,
 
     #[arg(long, default_value_t=reflecto::MIRROR_STATUS_URL.into())]
