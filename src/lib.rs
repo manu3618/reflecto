@@ -3,6 +3,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use clap::ValueEnum;
 use serde::Deserialize;
+use std::collections::HashSet;
 use std::fmt;
 use std::fs::File;
 use std::io::Write;
@@ -112,6 +113,14 @@ impl MirrorList {
             .map(|m| format!("Server = {}$repo/os/$arch", m.url))
             .collect::<Vec<_>>()
             .join("\n")
+    }
+
+    /// get a list of all countries in which a mirror is present
+    fn get_countries(&self) -> HashSet<String> {
+        self.mirrors
+            .iter()
+            .filter_map(|m| m.country.clone())
+            .collect()
     }
 }
 
