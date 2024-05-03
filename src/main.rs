@@ -8,12 +8,21 @@ struct MirrorList {
 }
 #[derive(Debug, Default, Deserialize)]
 struct Mirror {
+    /// url
     url: String,
     protocol: Protocol,
     score: f64,
+    delay: Option<f64>,
+    /// detailed url
     details: String,
 }
-#[derive(Debug, Default)]
+
+impl Mirror {
+    /// Update delay based on ping time.
+    fn update_delay(&mut self) {}
+}
+
+#[derive(Debug, Default, Deserialize)]
 enum Protocol {
     #[default]
     HTTPS,
