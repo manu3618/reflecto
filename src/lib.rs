@@ -140,11 +140,11 @@ impl Mirror {
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum Protocol {
-    FTP,
+    Ftp,
     #[default]
-    HTTPS,
-    HTTP,
-    RSYNC,
+    Https,
+    Http,
+    Rsync,
 }
 
 #[derive(Debug)]
