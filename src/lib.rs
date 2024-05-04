@@ -3,6 +3,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use clap::ValueEnum;
 use serde::Deserialize;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
 use std::fs::File;
@@ -38,7 +39,7 @@ impl fmt::Display for SortKey {
     }
 }
 
-#[derive(Debug, Default, PartialEq, PartialOrd)]
+#[derive(Debug, Default, PartialEq, PartialOrd, Clone)]
 /// Download rate
 struct Bandwidth(f64);
 
@@ -85,7 +86,14 @@ impl MirrorList {
             SortKey::Age => self
                 .mirrors
                 .sort_by_key(|m| m.last_sync.unwrap_or_default()),
-            SortKey::Rate => todo!(),
+            SortKey::Rate => self.mirrors.sort_by(|m, n| {
+                // inverse m and n to sordt in desc ordoer
+                n.download_rate
+                    .clone()
+                    .unwrap_or_default()
+                    .partial_cmp(&m.download_rate.clone().unwrap_or_default())
+                    .unwrap_or(Ordering::Equal)
+            }),
             SortKey::Country => self
                 .mirrors
                 .sort_by_key(|m| m.country.clone().unwrap_or_default()),
