@@ -8,6 +8,7 @@ use std::fmt;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+use tokio::task::JoinSet;
 
 pub static MIRROR_STATUS_URL: &str = "https://archlinux.org/mirrors/status/json";
 
@@ -168,6 +169,31 @@ impl MirrorList {
             lines.push(get_country_line(&c.0 .0, &c.0 .1, c.1, longuest));
         }
         lines.join("\n")
+    }
+
+    async fn update_donwload_rate(
+        &'static mut self,
+        timeout: Option<chrono::Duration>,
+        limit: Option<usize>,
+    ) {
+        // TODO: review lifetime
+        let mut left = self.mirrors.len().min(limit.unwrap_or(usize::MAX));
+        let mut set = JoinSet::new();
+        for m in self.mirrors.iter_mut() {
+            set.spawn(async move { m.update_download_rate(timeout).await });
+        }
+        while let Some(res) = set.join_next().await {
+            match res {
+                Ok(_) => left -= 1,
+                Err(e) => {
+                    // TODO log message
+                    dbg!(&e);
+                }
+            }
+            if left == 0 {
+                break;
+            }
+        }
     }
 }
 
