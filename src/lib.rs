@@ -38,6 +38,20 @@ impl fmt::Display for SortKey {
     }
 }
 
+#[derive(Debug, Default, PartialEq, PartialOrd)]
+/// Download rate
+struct Bandwidth(f64);
+
+impl Bandwidth {
+    fn from_duration(duration: Duration, bytes_quantity: f64) -> Self {
+        if bytes_quantity == 0.0 {
+            Self(f64::NAN)
+        } else {
+            Self(bytes_quantity / (1000.0 * duration.num_milliseconds() as f64))
+        }
+    }
+}
+
 #[derive(Debug, Default, Deserialize)]
 pub struct MirrorList {
     #[serde(rename = "urls")]
@@ -149,7 +163,7 @@ impl MirrorList {
         lines.push(format!("Country{} Code Count", " ".repeat(longuest - 7)));
         lines.push(format!("{} ---- ----", "-".repeat(longuest)));
         for c in countries {
-            if c.0 .0 == "" {
+            if c.0 .0.is_empty() {
                 continue;
             }
             lines.push(get_country_line(&c.0 .0, &c.0 .1, c.1, longuest));
@@ -162,7 +176,7 @@ fn get_country_line(country: &str, code: &str, count: usize, country_len: usize)
     debug_assert!(country_len >= country.chars().count());
     let padding = " ".repeat(country_len - country.chars().count());
     debug_assert!(code.len() == 2);
-    format!("{}{} {: >4} {: >4}", country, padding, code, count).into()
+    format!("{}{} {: >4} {: >4}", country, padding, code, count)
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -180,6 +194,9 @@ struct Mirror {
     last_sync: Option<DateTime<Utc>>,
     /// detailed url
     details: String,
+
+    #[serde(skip)]
+    download_rate: Option<Bandwidth>,
 }
 
 /// home made implementation of serde deserializer for dates
@@ -205,8 +222,10 @@ mod parse_date {
 }
 
 impl Mirror {
-    /// Update delay based on ping time.
-    fn update_delay(&mut self) {}
+    /// Update download rate.
+    fn update_download_rate(&mut self) {
+        todo!()
+    }
 
     /// Compute mirror age based on last server synchronisation
     fn age(&self) -> Option<Duration> {
