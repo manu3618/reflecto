@@ -2,6 +2,7 @@ use clap::Parser;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
+use tokio;
 
 /// retrieve, filter, sort a list of the lastest Arch Linux mirrors
 #[derive(Parser, Debug)]
@@ -26,12 +27,19 @@ struct Args {
     save: Option<PathBuf>,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse();
     let mut mlist = reflecto::MirrorList::from_url(&args.url).unwrap();
     if args.list_countries {
         println!("{}", mlist.print_countries());
         return;
+    }
+    match args.sort {
+        reflecto::SortKey::Rate => {
+            let _ = mlist.update_download_rate(None, args.number).await;
+        }
+        _ => {}
     }
     mlist.sort(args.sort);
     let content = mlist.to_file_content(args.number);

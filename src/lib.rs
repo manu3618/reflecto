@@ -179,13 +179,13 @@ impl MirrorList {
         lines.join("\n")
     }
 
-    async fn update_donwload_rate(
+    pub async fn update_download_rate(
         &'static mut self,
         timeout: Option<chrono::Duration>,
-        limit: Option<usize>,
+        limit: usize,
     ) {
         // TODO: review lifetime
-        let mut left = self.mirrors.len().min(limit.unwrap_or(usize::MAX));
+        let mut left = self.mirrors.len().min(limit);
         let mut set = JoinSet::new();
         for m in self.mirrors.iter_mut() {
             set.spawn(async move { m.update_download_rate(timeout).await });
