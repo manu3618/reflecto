@@ -1,6 +1,5 @@
 use anyhow::Result;
 use chrono::DateTime;
-use chrono::Duration;
 use chrono::Utc;
 use clap::ValueEnum;
 use serde::Deserialize;
@@ -43,11 +42,11 @@ impl fmt::Display for SortKey {
 struct Bandwidth(f64);
 
 impl Bandwidth {
-    fn from_duration(duration: Duration, bytes_quantity: f64) -> Self {
-        if bytes_quantity == 0.0 {
+    fn from_duration(duration: chrono::Duration, bytes_quantity: usize) -> Self {
+        if bytes_quantity == 0 {
             Self(f64::NAN)
         } else {
-            Self(bytes_quantity / (1000.0 * duration.num_milliseconds() as f64))
+            Self(bytes_quantity as f64 / (1000.0 * duration.num_milliseconds() as f64))
         }
     }
 }
@@ -223,12 +222,35 @@ mod parse_date {
 
 impl Mirror {
     /// Update download rate.
-    fn update_download_rate(&mut self) {
-        todo!()
+    async fn update_download_rate(&mut self, timeout: Option<chrono::Duration>) -> Result<()> {
+        let client = match timeout {
+            Some(d) => reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(
+                    d.num_seconds().try_into().unwrap(),
+                ))
+                .build()?,
+            None => reqwest::Client::new(),
+        };
+        let now = Utc::now();
+        let response = client
+            .get(format!("{}/extra/os/x86_64/extra.db", self.url))
+            .send()
+            .await?;
+        let content = match response.bytes().await {
+            Ok(c) => c,
+            Err(e) => {
+                // TODO: get the first bytes received before the timeout
+                dbg!(&e);
+                return Err(e.into());
+            }
+        };
+        let end = Utc::now();
+        self.download_rate = Some(Bandwidth::from_duration(end - now, content.len()));
+        Ok(())
     }
 
     /// Compute mirror age based on last server synchronisation
-    fn age(&self) -> Option<Duration> {
+    fn age(&self) -> Option<chrono::Duration> {
         if let Some(last_sync) = self.last_sync {
             Some(Utc::now() - last_sync)
         } else {
@@ -250,6 +272,7 @@ enum Protocol {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio;
 
     static MIRROR0: &str = r#"
              {
@@ -305,6 +328,24 @@ mod tests {
                 "ipv6": true,
                 "details": "https://archlinux.org/mirrors/aarnet.edu.au/5/"
             }"#;
+    static MIRROR3: &str = r#"
+            {
+                "url": "http://mirror.rackspace.com/archlinux/",
+                "protocol": "http",
+                "last_sync": "2024-05-04T09:30:12Z",
+                "completion_pct": 0.8645833333333334,
+                "delay": 12205,
+                "duration_avg": 0.3613546647523579,
+                "duration_stddev": 0.42918278405415544,
+                "score": 4.83564170785653,
+                "active": true,
+                "country": "",
+                "country_code": "",
+                "isos": true,
+                "ipv4": true,
+                "ipv6": false,
+                "details": "https://archlinux.org/mirrors/rackspace.com/712/"
+            }"#;
 
     #[test]
     fn mirror0() {
@@ -340,5 +381,29 @@ mod tests {
         ); // 2024-04
         assert_eq!(ml.mirrors[2].url, "http://ftp.ntua.gr/pub/linux/archlinux/");
         // 2024-05
+    }
+
+    #[tokio::test]
+    async fn update_duration() {
+        let mut m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
+        let _ = m.update_download_rate(None).await;
+        dbg!(&m);
+        assert!(m.download_rate.is_some());
+    }
+
+    #[tokio::test]
+    async fn update_duration_large_timeout() {
+        let mut m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
+        let _ = m.update_download_rate(chrono::Duration::new(20, 0)).await;
+        dbg!(&m);
+        assert!(m.download_rate.is_some());
+    }
+
+    #[tokio::test]
+    async fn update_duration_small_timeout() {
+        let mut m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
+        let _ = m.update_download_rate(chrono::Duration::new(0, 1)).await;
+        dbg!(&m);
+        assert!(m.download_rate.is_none());
     }
 }
