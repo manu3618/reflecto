@@ -1,3 +1,4 @@
+use chrono::Duration;
 use clap::Parser;
 use std::fs::File;
 use std::io::Write;
@@ -8,8 +9,12 @@ use tokio;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
+    #[arg(long, default_value_t = 5)]
+    /// Number of seconds to wait before a download times out
+    download_timeout: i64,
+
     #[arg(long, action)]
-    ///  Display a table of the distribution of server by country
+    /// Display a table of the distribution of server by country
     list_countries: bool,
 
     #[arg(long, default_value_t=reflecto::MIRROR_STATUS_URL.into())]
@@ -37,7 +42,8 @@ async fn main() {
     }
     match args.sort {
         reflecto::SortKey::Rate => {
-            let _ = mlist.update_download_rate(None, args.number).await;
+            let timeout = Duration::seconds(args.download_timeout);
+            let _ = mlist.update_download_rate(Some(timeout), args.number).await;
         }
         _ => {}
     }
