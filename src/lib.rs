@@ -179,16 +179,12 @@ impl MirrorList {
         lines.join("\n")
     }
 
-    pub async fn update_download_rate(
-        &'static mut self,
-        timeout: Option<chrono::Duration>,
-        limit: usize,
-    ) {
+    pub async fn update_download_rate(&mut self, timeout: Option<chrono::Duration>, limit: usize) {
         // TODO: review lifetime
         let mut left = self.mirrors.len().min(limit);
         let mut set = JoinSet::new();
-        for m in self.mirrors.iter_mut() {
-            set.spawn(async move { m.update_download_rate(timeout).await });
+        for m in self.mirrors.drain(..) {
+            set.spawn(m.update_download_rate(timeout));
         }
         while let Some(res) = set.join_next().await {
             match res {
@@ -202,6 +198,7 @@ impl MirrorList {
                 break;
             }
         }
+        set.shutdown().await;
     }
 }
 
@@ -256,7 +253,7 @@ mod parse_date {
 
 impl Mirror {
     /// Update download rate.
-    async fn update_download_rate(&mut self, timeout: Option<chrono::Duration>) -> Result<()> {
+    async fn update_dl_rate(&mut self, timeout: Option<chrono::Duration>) -> Result<()> {
         let client = match timeout {
             Some(d) => reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(
@@ -281,6 +278,12 @@ impl Mirror {
         let end = Utc::now();
         self.download_rate = Some(Bandwidth::from_duration(end - now, content.len()));
         Ok(())
+    }
+
+    /// Update download rate. Function that can be used by MirrorList
+    async fn update_download_rate(mut self, timeout: Option<chrono::Duration>) -> Self {
+        let _ = self.update_dl_rate(timeout).await;
+        self
     }
 
     /// Compute mirror age based on last server synchronisation
@@ -420,7 +423,7 @@ mod tests {
     #[tokio::test]
     async fn update_duration() {
         let mut m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
-        let _ = m.update_download_rate(None).await;
+        let m = m.update_download_rate(None).await;
         dbg!(&m);
         assert!(m.download_rate.is_some());
     }
@@ -428,7 +431,7 @@ mod tests {
     #[tokio::test]
     async fn update_duration_large_timeout() {
         let mut m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
-        let _ = m.update_download_rate(chrono::Duration::new(20, 0)).await;
+        let m = m.update_download_rate(chrono::Duration::new(20, 0)).await;
         dbg!(&m);
         assert!(m.download_rate.is_some());
     }
@@ -436,7 +439,7 @@ mod tests {
     #[tokio::test]
     async fn update_duration_small_timeout() {
         let mut m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
-        let _ = m.update_download_rate(chrono::Duration::new(0, 1)).await;
+        let m = m.update_download_rate(chrono::Duration::new(0, 1)).await;
         dbg!(&m);
         assert!(m.download_rate.is_none());
     }
