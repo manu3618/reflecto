@@ -63,19 +63,27 @@ pub struct MirrorList {
 }
 
 impl MirrorList {
-    pub fn from_default_url() -> Result<Self> {
-        Self::from_url(MIRROR_STATUS_URL)
+    pub async fn from_default_url() -> Result<Self> {
+        Self::from_url(MIRROR_STATUS_URL).await
     }
 
-    pub fn from_url(url: &str) -> Result<Self> {
-        let body = reqwest::blocking::get(url)?.text()?;
+    pub async fn from_url(url: &str) -> Result<Self> {
+        dbg!(&url);
+        let body = reqwest::get(url).await?.text().await?;
+        dbg!(body.len());
+
         // XXX
         let mut file = File::create(Path::new("/tmp/json.json"))?;
         file.write_all(&body.clone().into_bytes())?;
         // XXX
 
-        let mut mlist: Self =
-            serde_json::from_str(&body).unwrap_or_else(|_| panic!("malformed JSON: {}", &body));
+        let mut mlist: Self = match serde_json::from_str(&body) {
+            Ok(x) => x,
+            Err(e) => {
+                eprintln!("malformed JSON: {}", &body);
+                return Err(e.into());
+            }
+        };
         mlist.source = Some(url.into());
         Ok(mlist)
     }
@@ -411,13 +419,17 @@ mod tests {
         let j = format!("{{\"urls\":[{MIRROR0},{MIRROR1},{MIRROR2}]}}");
         let mut ml: MirrorList = serde_json::from_str(&j).unwrap();
         ml.sort(SortKey::Age);
-        assert_eq!(ml.mirrors[0].url, "https://mirrors.rutgers.edu/archlinux/"); // null
+        // null
+        assert_eq!(ml.mirrors[0].url, "https://mirrors.rutgers.edu/archlinux/");
+
+        // 2024-04
         assert_eq!(
             ml.mirrors[1].url,
             "https://mirror.aarnet.edu.au/pub/archlinux/"
-        ); // 2024-04
-        assert_eq!(ml.mirrors[2].url, "http://ftp.ntua.gr/pub/linux/archlinux/");
+        );
+
         // 2024-05
+        assert_eq!(ml.mirrors[2].url, "http://ftp.ntua.gr/pub/linux/archlinux/");
     }
 
     #[tokio::test]
@@ -442,5 +454,20 @@ mod tests {
         let m = m.update_download_rate(chrono::Duration::new(0, 1)).await;
         dbg!(&m);
         assert!(m.download_rate.is_none());
+    }
+
+    #[tokio::test]
+    async fn update_duration_interrupt() {
+        let mut m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
+        let mut s = JoinSet::new();
+        s.spawn(m.update_download_rate(None));
+        s.abort_all();
+    }
+
+    #[tokio::test]
+    async fn update_mirrorlist_dl_rate() {
+        let mut mlist = MirrorList::from_default_url().await.unwrap();
+        mlist.update_download_rate(None, 5).await;
+        dbg!(&mlist);
     }
 }
