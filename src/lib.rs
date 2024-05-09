@@ -53,7 +53,7 @@ impl Bandwidth {
     }
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 pub struct MirrorList {
     #[serde(rename = "urls")]
     mirrors: Vec<Mirror>,
@@ -68,9 +68,7 @@ impl MirrorList {
     }
 
     pub async fn from_url(url: &str) -> Result<Self> {
-        dbg!(&url);
         let body = reqwest::get(url).await?.text().await?;
-        dbg!(body.len());
 
         // XXX
         let mut file = File::create(Path::new("/tmp/json.json"))?;
@@ -188,18 +186,21 @@ impl MirrorList {
     }
 
     pub async fn update_download_rate(&mut self, timeout: Option<chrono::Duration>, limit: usize) {
-        // TODO: review lifetime
         let mut left = self.mirrors.len().min(limit);
+        let mut mirrors = Vec::new();
         let mut set = JoinSet::new();
         for m in self.mirrors.drain(..) {
+            mirrors.push(m.clone());
             set.spawn(m.update_download_rate(timeout));
         }
         while let Some(res) = set.join_next().await {
             match res {
-                Ok(_) => left -= 1,
-                Err(e) => {
+                Ok(Ok(m)) => {
+                    let _ = &self.mirrors.push(m);
+                    left -= 1;
+                }
+                _ => {
                     // TODO log message
-                    dbg!(&e);
                 }
             }
             if left == 0 {
@@ -207,6 +208,19 @@ impl MirrorList {
             }
         }
         set.shutdown().await;
+
+        // push not updated mirrors
+        let ok_urls = &self
+            .mirrors
+            .iter()
+            .map(|m| m.url.clone())
+            .collect::<Vec<_>>();
+        self.mirrors.append(
+            &mut mirrors
+                .into_iter()
+                .filter(|m| !ok_urls.contains(&m.url))
+                .collect::<Vec<_>>(),
+        );
     }
 }
 
@@ -217,7 +231,7 @@ fn get_country_line(country: &str, code: &str, count: usize, country_len: usize)
     format!("{}{} {: >4} {: >4}", country, padding, code, count)
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 struct Mirror {
     /// url
     url: String,
@@ -289,9 +303,9 @@ impl Mirror {
     }
 
     /// Update download rate. Function that can be used by MirrorList
-    async fn update_download_rate(mut self, timeout: Option<chrono::Duration>) -> Self {
-        let _ = self.update_dl_rate(timeout).await;
-        self
+    async fn update_download_rate(mut self, timeout: Option<chrono::Duration>) -> Result<Self> {
+        self.update_dl_rate(timeout).await?;
+        Ok(self)
     }
 
     /// Compute mirror age based on last server synchronisation
@@ -304,7 +318,7 @@ impl Mirror {
     }
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum Protocol {
     Ftp,
@@ -434,31 +448,35 @@ mod tests {
 
     #[tokio::test]
     async fn update_duration() {
-        let mut m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
-        let m = m.update_download_rate(None).await;
-        dbg!(&m);
+        let m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
+        let m = m.update_download_rate(None).await.unwrap();
         assert!(m.download_rate.is_some());
     }
 
     #[tokio::test]
     async fn update_duration_large_timeout() {
-        let mut m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
-        let m = m.update_download_rate(chrono::Duration::new(20, 0)).await;
-        dbg!(&m);
+        let m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
+        let m = m
+            .update_download_rate(chrono::Duration::new(20, 0))
+            .await
+            .unwrap();
         assert!(m.download_rate.is_some());
     }
 
     #[tokio::test]
     async fn update_duration_small_timeout() {
-        let mut m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
-        let m = m.update_download_rate(chrono::Duration::new(0, 1)).await;
+        let m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
+        let r = m
+            .clone()
+            .update_download_rate(chrono::Duration::new(0, 1))
+            .await;
         dbg!(&m);
-        assert!(m.download_rate.is_none());
+        assert!(r.is_err());
     }
 
     #[tokio::test]
     async fn update_duration_interrupt() {
-        let mut m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
+        let m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
         let mut s = JoinSet::new();
         s.spawn(m.update_download_rate(None));
         s.abort_all();
@@ -467,7 +485,15 @@ mod tests {
     #[tokio::test]
     async fn update_mirrorlist_dl_rate() {
         let mut mlist = MirrorList::from_default_url().await.unwrap();
-        mlist.update_download_rate(None, 5).await;
-        dbg!(&mlist);
+        mlist.mirrors.truncate(15);
+        let mlentgth = mlist.mirrors.len();
+        mlist.update_download_rate(None, 3).await;
+        mlist.sort(SortKey::Rate);
+        let mirrors = &mlist.mirrors.clone();
+        assert!(!&mirrors.is_empty());
+        assert!(
+            mirrors[0].download_rate.clone().unwrap() >= mirrors[1].download_rate.clone().unwrap()
+        );
+        assert_eq!(mlentgth, mlist.mirrors.len());
     }
 }

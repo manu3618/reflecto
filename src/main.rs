@@ -34,7 +34,6 @@ struct Args {
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
-    dbg!(&args);
     let mut mlist = reflecto::MirrorList::from_url(&args.url).await.unwrap();
     if args.list_countries {
         println!("{}", mlist.print_countries());
@@ -44,7 +43,6 @@ async fn main() {
         reflecto::SortKey::Rate => {
             let timeout = Duration::seconds(args.download_timeout);
             let _ = mlist.update_download_rate(Some(timeout), args.number).await;
-            dbg!(&mlist);
         }
         _ => {}
     }
