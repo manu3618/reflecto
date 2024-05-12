@@ -54,6 +54,8 @@ impl Bandwidth {
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]
+/// List of archlinux mirror status as described in
+/// https://archlinux.org/mirrors/status/
 pub struct MirrorList {
     #[serde(rename = "urls")]
     mirrors: Vec<Mirror>,

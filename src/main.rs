@@ -4,30 +4,35 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
-/// retrieve, filter, sort a list of the lastest Arch Linux mirrors
+/// A port of Reflector.
+///
+/// This tool retrieve, filter, sort a list of the lastest Arch Linux mirrors
+/// from the archlinux mirror status
+/// and provide the content of the file `/etc/pacman.d/mirrorlist`.
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
+#[command(version, about, long_about)]
 struct Args {
-    #[arg(long, default_value_t = 5)]
     /// Number of seconds to wait before a download times out
+    #[arg(long, default_value_t = 5)]
     download_timeout: i64,
 
-    #[arg(long, action)]
     /// Display a table of the distribution of server by country
+    #[arg(long, action)]
     list_countries: bool,
 
-    #[arg(long, default_value_t=reflecto::MIRROR_STATUS_URL.into())]
     /// The URL from which to retrieve the mirror date in JSON format
+    #[arg(long, default_value_t=reflecto::MIRROR_STATUS_URL.into())]
     url: String,
 
     #[arg(short, long, default_value_t=reflecto::SortKey::Score)]
     sort: reflecto::SortKey,
 
+    /// the number of mirrors to keep
     #[arg(short, long, default_value_t=usize::MAX)]
     number: usize,
 
-    #[arg(long)]
     /// If provided, where to save. otherwise, output on stdin
+    #[arg(long)]
     save: Option<PathBuf>,
 }
 
