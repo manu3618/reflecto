@@ -44,12 +44,9 @@ async fn main() {
         println!("{}", mlist.print_countries());
         return;
     }
-    match args.sort {
-        reflecto::SortKey::Rate => {
-            let timeout = Duration::seconds(args.download_timeout);
-            let _ = mlist.update_download_rate(Some(timeout), args.number).await;
-        }
-        _ => {}
+    if let reflecto::SortKey::Rate = args.sort {
+        let timeout = Duration::seconds(args.download_timeout);
+        let _ = mlist.update_download_rate(Some(timeout), args.number).await;
     }
     mlist.sort(args.sort);
     let content = mlist.to_file_content(args.number);

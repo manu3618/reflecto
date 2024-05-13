@@ -39,8 +39,8 @@ impl fmt::Display for SortKey {
     }
 }
 
-#[derive(Debug, Default, PartialEq, PartialOrd, Clone)]
 /// Download rate
+#[derive(Debug, Default, PartialEq, PartialOrd, Clone)]
 struct Bandwidth(f64);
 
 impl Bandwidth {
@@ -53,9 +53,9 @@ impl Bandwidth {
     }
 }
 
-#[derive(Debug, Default, Clone, Deserialize)]
 /// List of archlinux mirror status as described in
-/// https://archlinux.org/mirrors/status/
+/// <https://archlinux.org/mirrors/status/>
+#[derive(Debug, Default, Clone, Deserialize)]
 pub struct MirrorList {
     #[serde(rename = "urls")]
     mirrors: Vec<Mirror>,
@@ -312,11 +312,7 @@ impl Mirror {
 
     /// Compute mirror age based on last server synchronisation
     fn age(&self) -> Option<chrono::Duration> {
-        if let Some(last_sync) = self.last_sync {
-            Some(Utc::now() - last_sync)
-        } else {
-            None
-        }
+        self.last_sync.map(|last_sync| Utc::now() - last_sync)
     }
 }
 
