@@ -39,8 +39,8 @@ impl fmt::Display for SortKey {
     }
 }
 
-#[derive(Debug, Default, PartialEq, PartialOrd, Clone)]
 /// Download rate
+#[derive(Debug, Default, PartialEq, PartialOrd, Clone)]
 struct Bandwidth(f64);
 
 impl Bandwidth {
@@ -53,9 +53,9 @@ impl Bandwidth {
     }
 }
 
-#[derive(Debug, Default, Clone, Deserialize)]
 /// List of archlinux mirror status as described in
-/// https://archlinux.org/mirrors/status/
+/// <https://archlinux.org/mirrors/status/>
+#[derive(Debug, Default, Clone, Deserialize)]
 pub struct MirrorList {
     #[serde(rename = "urls")]
     mirrors: Vec<Mirror>,
@@ -312,11 +312,7 @@ impl Mirror {
 
     /// Compute mirror age based on last server synchronisation
     fn age(&self) -> Option<chrono::Duration> {
-        if let Some(last_sync) = self.last_sync {
-            Some(Utc::now() - last_sync)
-        } else {
-            None
-        }
+        self.last_sync.map(|last_sync| Utc::now() - last_sync)
     }
 }
 
@@ -497,5 +493,16 @@ mod tests {
             mirrors[0].download_rate.clone().unwrap() >= mirrors[1].download_rate.clone().unwrap()
         );
         assert_eq!(mlentgth, mlist.mirrors.len());
+    }
+
+    #[test]
+    fn age_computation() {
+        let j = format!("{{\"urls\":[{MIRROR0},{MIRROR1},{MIRROR2}]}}");
+        let mut ml: MirrorList = serde_json::from_str(&j).unwrap();
+        let [ref m0, ref m1, ref m2] = ml.mirrors.clone()[0..3] else {
+            panic!()
+        };
+        assert_eq!(m0.age(), None);
+        assert!(m1.age() < m2.age());
     }
 }
