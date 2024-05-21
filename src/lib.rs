@@ -494,4 +494,15 @@ mod tests {
         );
         assert_eq!(mlentgth, mlist.mirrors.len());
     }
+
+    #[test]
+    fn age_computation() {
+        let j = format!("{{\"urls\":[{MIRROR0},{MIRROR1},{MIRROR2}]}}");
+        let mut ml: MirrorList = serde_json::from_str(&j).unwrap();
+        let [ref m0, ref m1, ref m2] = ml.mirrors.clone()[0..3] else {
+            panic!()
+        };
+        assert_eq!(m0.age(), None);
+        assert!(m1.age() < m2.age());
+    }
 }
