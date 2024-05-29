@@ -10,6 +10,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use tokio::task::JoinSet;
+use tracing::{debug, instrument, span, Level};
 
 pub static MIRROR_STATUS_URL: &str = "https://archlinux.org/mirrors/status/json";
 
@@ -187,6 +188,7 @@ impl MirrorList {
         lines.join("\n")
     }
 
+    #[instrument]
     pub async fn update_download_rate(&mut self, timeout: Option<chrono::Duration>, limit: usize) {
         let mut left = self.mirrors.len().min(limit);
         let mut mirrors = Vec::new();
@@ -202,10 +204,11 @@ impl MirrorList {
                     left -= 1;
                 }
                 _ => {
-                    // TODO log message
+                    debug!("failed to update a mirror")
                 }
             }
             if left == 0 {
+                debug!("enough mirror updated");
                 break;
             }
         }
@@ -278,6 +281,8 @@ mod parse_date {
 impl Mirror {
     /// Update download rate.
     async fn update_dl_rate(&mut self, timeout: Option<chrono::Duration>) -> Result<()> {
+        let span = span!(Level::DEBUG, "update download rate", url = self.url.clone());
+        let _guard = span.enter();
         let client = match timeout {
             Some(d) => reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(
@@ -295,7 +300,7 @@ impl Mirror {
             Ok(c) => c,
             Err(e) => {
                 // TODO: get the first bytes received before the timeout
-                dbg!(&e);
+                debug!("{:?}", &e);
                 return Err(e.into());
             }
         };
@@ -468,7 +473,6 @@ mod tests {
             .clone()
             .update_download_rate(chrono::Duration::new(0, 1))
             .await;
-        dbg!(&m);
         assert!(r.is_err());
     }
 
