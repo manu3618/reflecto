@@ -3,6 +3,8 @@ use clap::Parser;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
+use tracing;
+use tracing::info;
 
 /// A port of Reflector.
 ///
@@ -38,6 +40,9 @@ struct Args {
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .init();
     let args = Args::parse();
     let mut mlist = reflecto::MirrorList::from_url(&args.url).await.unwrap();
     if args.list_countries {
@@ -51,8 +56,9 @@ async fn main() {
     mlist.sort(args.sort);
     let content = mlist.to_file_content(args.number);
     if let Some(fp) = args.save {
-        let mut file = File::create(fp).expect("unable to create file");
+        let mut file = File::create(fp.clone()).expect("unable to create file");
         let _ = file.write_all(&content.into_bytes());
+        info!("file written to {:?}", fp);
     } else {
         println!("{}", content);
     }

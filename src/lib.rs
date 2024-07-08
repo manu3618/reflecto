@@ -10,7 +10,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use tokio::task::JoinSet;
-use tracing::{debug, instrument, span, Level};
+use tracing::{debug, info, instrument, span, Level};
 
 pub static MIRROR_STATUS_URL: &str = "https://archlinux.org/mirrors/status/json";
 
@@ -306,6 +306,7 @@ impl Mirror {
         };
         let end = Utc::now();
         self.download_rate = Some(Bandwidth::from_duration(end - now, content.len()));
+        info!("donwload rate updated for url {}", self.url.clone());
         Ok(())
     }
 
