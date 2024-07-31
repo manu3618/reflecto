@@ -36,6 +36,11 @@ struct Args {
     /// If provided, where to save. otherwise, output on stdin
     #[arg(long)]
     save: Option<PathBuf>,
+
+    /// Only return mirrors that have synchronized in the last n hours. n may be an integer or
+    /// a decimal number.
+    #[arg(short, long)]
+    age: Option<f64>,
 }
 
 #[tokio::main]
@@ -49,6 +54,7 @@ async fn main() {
         println!("{}", mlist.print_countries());
         return;
     }
+    mlist = mlist.filter(args.age);
     if let reflecto::SortKey::Rate = args.sort {
         let timeout = Duration::seconds(args.download_timeout);
         let _ = mlist.update_download_rate(Some(timeout), args.number).await;

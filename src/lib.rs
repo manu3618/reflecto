@@ -227,6 +227,22 @@ impl MirrorList {
                 .collect::<Vec<_>>(),
         );
     }
+
+    /// Filter out mirrors based on criteria:
+    /// age: filter out mirrors not synchronized in the last n hours
+    pub fn filter(self, age: Option<f64>) -> Self {
+        let mut ml = self.mirrors;
+        if let Some(age) = age {
+            ml.retain(|m| match m.age() {
+                Some(d) => d.num_hours() as f64 + d.num_minutes() as f64 / 60.0 < age,
+                _ => false,
+            });
+        }
+        Self {
+            mirrors: ml,
+            ..self
+        }
+    }
 }
 
 fn get_country_line(country: &str, code: &str, count: usize, country_len: usize) -> String {
@@ -335,6 +351,7 @@ enum Protocol {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::TimeDelta;
     use tokio;
 
     static MIRROR0: &str = r#"
@@ -509,5 +526,33 @@ mod tests {
         };
         assert_eq!(m0.age(), None);
         assert!(m1.age() < m2.age());
+    }
+
+    #[test]
+    fn age_filter() {
+        let j = format!("{{\"urls\":[{MIRROR0},{MIRROR1},{MIRROR2}]}}");
+        let mut ml: MirrorList = serde_json::from_str(&j).unwrap();
+        let mirror = ml.mirrors[0].clone();
+        let now = Utc::now() + TimeDelta::minutes(10);
+        for h in 0..20 {
+            ml.mirrors.push(Mirror {
+                last_sync: Some(now - TimeDelta::hours(h)),
+                ..mirror.clone()
+            })
+        }
+        let mut cur_len = ml.mirrors.len();
+        assert_eq!(cur_len, 23);
+
+        ml = ml.filter(None);
+        assert_eq!(ml.mirrors.len(), cur_len);
+
+        for age in (0..30).rev() {
+            ml = ml.filter(Some(age as f64 * 0.7));
+            assert!(ml.mirrors.len() <= cur_len);
+            cur_len = ml.mirrors.len();
+        }
+
+        // one mirror's age is -10min
+        assert_eq!(ml.mirrors.len(), 1)
     }
 }
