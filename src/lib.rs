@@ -230,7 +230,10 @@ impl MirrorList {
 
     /// Filter out mirrors based on criteria:
     /// age: filter out mirrors not synchronized in the last n hours
-    pub fn filter(self, age: Option<f64>) -> Self {
+    /// isos: if true, return only ISOs hosts
+    /// ipv4: if true, return only ipv4 hosts
+    /// ipv6: if true, return only ipv6 hosts
+    pub fn filter(self, age: Option<f64>, isos: bool, ipv4: bool, ipv6: bool) -> Self {
         let mut ml = self.mirrors;
         if let Some(age) = age {
             ml.retain(|m| match m.age() {
@@ -238,6 +241,16 @@ impl MirrorList {
                 _ => false,
             });
         }
+        if isos {
+            ml.retain(|m| m.isos.unwrap_or(false))
+        }
+        if ipv4 {
+            ml.retain(|m| m.ipv4.unwrap_or(false))
+        }
+        if ipv6 {
+            ml.retain(|m| m.ipv6.unwrap_or(false))
+        }
+
         Self {
             mirrors: ml,
             ..self
@@ -265,6 +278,10 @@ struct Mirror {
     #[serde(default)]
     #[serde(with = "parse_date")]
     last_sync: Option<DateTime<Utc>>,
+
+    isos: Option<bool>,
+    ipv4: Option<bool>,
+    ipv6: Option<bool>,
     /// detailed url
     details: String,
 
@@ -352,6 +369,7 @@ enum Protocol {
 mod tests {
     use super::*;
     use chrono::TimeDelta;
+    use itertools::Itertools;
     use tokio;
 
     static MIRROR0: &str = r#"
@@ -543,16 +561,51 @@ mod tests {
         let mut cur_len = ml.mirrors.len();
         assert_eq!(cur_len, 23);
 
-        ml = ml.filter(None);
+        ml = ml.filter(None, false, false, false);
         assert_eq!(ml.mirrors.len(), cur_len);
 
         for age in (0..30).rev() {
-            ml = ml.filter(Some(age as f64 * 0.7));
+            ml = ml.filter(Some(age as f64 * 0.7), false, false, false);
             assert!(ml.mirrors.len() <= cur_len);
             cur_len = ml.mirrors.len();
         }
 
         // one mirror's age is -10min
         assert_eq!(ml.mirrors.len(), 1)
+    }
+
+    #[test]
+    fn flags_filter() {
+        let j = format!("{{\"urls\":[{MIRROR0},{MIRROR1},{MIRROR2}]}}");
+        let mut ml: MirrorList = serde_json::from_str(&j).unwrap();
+        let mirror = ml.mirrors[0].clone();
+        let flags = vec![None, Some(true), Some(false)]
+            .into_iter()
+            .combinations_with_replacement(3);
+        for flag in flags {
+            ml.mirrors.push(Mirror {
+                isos: flag[0],
+                ipv4: flag[1],
+                ipv6: flag[2],
+                ..mirror.clone()
+            })
+        }
+        let cur_len = ml.mirrors.len();
+        let ml_iso = ml.clone().filter(None, true, false, false);
+        assert!(ml_iso.mirrors.iter().all(|m| m.isos.unwrap_or(false)));
+
+        let ml_ip4 = ml.clone().filter(None, false, true, false);
+        assert!(ml_ip4.mirrors.iter().all(|m| m.ipv4.unwrap_or(false)));
+
+        let ml_ip6 = ml.clone().filter(None, false, false, true);
+        assert!(ml_ip6.mirrors.iter().all(|m| m.ipv6.unwrap_or(false)));
+
+        ml = ml.filter(None, true, true, true);
+        assert!(ml
+            .mirrors
+            .iter()
+            .all(|m| m.isos.unwrap_or(false) & m.ipv4.unwrap_or(false) & m.ipv6.unwrap_or(false)));
+        assert!(ml.mirrors.len() < cur_len);
+        assert!(ml.mirrors.len() > 0);
     }
 }
