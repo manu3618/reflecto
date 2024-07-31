@@ -19,7 +19,7 @@ struct Args {
     download_timeout: i64,
 
     /// Display a table of the distribution of server by country
-    #[arg(long, action)]
+    #[arg(long)]
     list_countries: bool,
 
     /// The URL from which to retrieve the mirror date in JSON format
@@ -41,6 +41,18 @@ struct Args {
     /// a decimal number.
     #[arg(short, long)]
     age: Option<f64>,
+
+    /// Only return mirrors that host ISOs.
+    #[arg(long)]
+    isos: bool,
+
+    /// Only return mirrors that support IPv4.
+    #[arg(long)]
+    ipv4: bool,
+
+    /// Only return mirrors that support IPv6.
+    #[arg(long)]
+    ipv6: bool,
 }
 
 #[tokio::main]
@@ -54,7 +66,7 @@ async fn main() {
         println!("{}", mlist.print_countries());
         return;
     }
-    mlist = mlist.filter(args.age);
+    mlist = mlist.filter(args.age, args.isos, args.ipv4, args.ipv6);
     if let reflecto::SortKey::Rate = args.sort {
         let timeout = Duration::seconds(args.download_timeout);
         let _ = mlist.update_download_rate(Some(timeout), args.number).await;
