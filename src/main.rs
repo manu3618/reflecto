@@ -1,9 +1,9 @@
 use chrono::Duration;
 use clap::Parser;
+use reflecto::Protocol;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
-use tracing;
 use tracing::info;
 
 /// A port of Reflector.
@@ -42,6 +42,10 @@ struct Args {
     #[arg(short, long)]
     age: Option<f64>,
 
+    /// Match one of the given protocols. Multiple protocols may be selected.
+    #[arg(short, long)]
+    protocol: Vec<Protocol>,
+
     /// Only return mirrors that host ISOs.
     #[arg(long)]
     isos: bool,
@@ -66,7 +70,7 @@ async fn main() {
         println!("{}", mlist.print_countries());
         return;
     }
-    mlist = mlist.filter(args.age, args.isos, args.ipv4, args.ipv6);
+    mlist = mlist.filter(args.age, args.isos, args.ipv4, args.ipv6, &args.protocol);
     if let reflecto::SortKey::Rate = args.sort {
         let timeout = Duration::seconds(args.download_timeout);
         let _ = mlist.update_download_rate(Some(timeout), args.number).await;

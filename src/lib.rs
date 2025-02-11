@@ -233,7 +233,15 @@ impl MirrorList {
     /// isos: if true, return only ISOs hosts
     /// ipv4: if true, return only ipv4 hosts
     /// ipv6: if true, return only ipv6 hosts
-    pub fn filter(self, age: Option<f64>, isos: bool, ipv4: bool, ipv6: bool) -> Self {
+    /// protocol: if any, retun only those protocols
+    pub fn filter(
+        self,
+        age: Option<f64>,
+        isos: bool,
+        ipv4: bool,
+        ipv6: bool,
+        protocol: &[Protocol],
+    ) -> Self {
         let mut ml = self.mirrors;
         if let Some(age) = age {
             ml.retain(|m| match m.age() {
@@ -249,6 +257,9 @@ impl MirrorList {
         }
         if ipv6 {
             ml.retain(|m| m.ipv6.unwrap_or(false))
+        }
+        if !protocol.is_empty() {
+            ml.retain(|m| protocol.contains(&m.protocol))
         }
 
         Self {
@@ -355,9 +366,9 @@ impl Mirror {
     }
 }
 
-#[derive(Debug, Default, Clone, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize, ValueEnum, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
-enum Protocol {
+pub enum Protocol {
     Ftp,
     #[default]
     Https,
@@ -365,12 +376,22 @@ enum Protocol {
     Rsync,
 }
 
+impl fmt::Display for Protocol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ftp => write!(f, "ftp"),
+            Self::Https => write!(f, "https"),
+            Self::Http => write!(f, "http"),
+            Self::Rsync => write!(f, "rsync"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use chrono::TimeDelta;
     use itertools::Itertools;
-    use tokio;
 
     static MIRROR0: &str = r#"
              {
@@ -487,14 +508,14 @@ mod tests {
 
     #[tokio::test]
     async fn update_duration() {
-        let m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
+        let m: Mirror = serde_json::from_str(MIRROR3).unwrap();
         let m = m.update_download_rate(None).await.unwrap();
         assert!(m.download_rate.is_some());
     }
 
     #[tokio::test]
     async fn update_duration_large_timeout() {
-        let m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
+        let m: Mirror = serde_json::from_str(MIRROR3).unwrap();
         let m = m
             .update_download_rate(chrono::Duration::new(20, 0))
             .await
@@ -504,7 +525,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_duration_small_timeout() {
-        let m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
+        let m: Mirror = serde_json::from_str(MIRROR3).unwrap();
         let r = m
             .clone()
             .update_download_rate(chrono::Duration::new(0, 1))
@@ -514,7 +535,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_duration_interrupt() {
-        let m: Mirror = serde_json::from_str(&MIRROR3).unwrap();
+        let m: Mirror = serde_json::from_str(MIRROR3).unwrap();
         let mut s = JoinSet::new();
         s.spawn(m.update_download_rate(None));
         s.abort_all();
@@ -538,7 +559,7 @@ mod tests {
     #[test]
     fn age_computation() {
         let j = format!("{{\"urls\":[{MIRROR0},{MIRROR1},{MIRROR2}]}}");
-        let mut ml: MirrorList = serde_json::from_str(&j).unwrap();
+        let ml: MirrorList = serde_json::from_str(&j).unwrap();
         let [ref m0, ref m1, ref m2] = ml.mirrors.clone()[0..3] else {
             panic!()
         };
@@ -561,11 +582,11 @@ mod tests {
         let mut cur_len = ml.mirrors.len();
         assert_eq!(cur_len, 23);
 
-        ml = ml.filter(None, false, false, false);
+        ml = ml.filter(None, false, false, false, &[]);
         assert_eq!(ml.mirrors.len(), cur_len);
 
         for age in (0..30).rev() {
-            ml = ml.filter(Some(age as f64 * 0.7), false, false, false);
+            ml = ml.filter(Some(age as f64 * 0.7), false, false, false, &[]);
             assert!(ml.mirrors.len() <= cur_len);
             cur_len = ml.mirrors.len();
         }
@@ -591,21 +612,32 @@ mod tests {
             })
         }
         let cur_len = ml.mirrors.len();
-        let ml_iso = ml.clone().filter(None, true, false, false);
+        let ml_iso = ml.clone().filter(None, true, false, false, &[]);
         assert!(ml_iso.mirrors.iter().all(|m| m.isos.unwrap_or(false)));
 
-        let ml_ip4 = ml.clone().filter(None, false, true, false);
+        let ml_ip4 = ml.clone().filter(None, false, true, false, &[]);
         assert!(ml_ip4.mirrors.iter().all(|m| m.ipv4.unwrap_or(false)));
 
-        let ml_ip6 = ml.clone().filter(None, false, false, true);
+        let ml_ip6 = ml.clone().filter(None, false, false, true, &[]);
         assert!(ml_ip6.mirrors.iter().all(|m| m.ipv6.unwrap_or(false)));
 
-        ml = ml.filter(None, true, true, true);
+        for proto in [
+            vec![Protocol::Rsync, Protocol::Https],
+            vec![Protocol::Http],
+            vec![Protocol::Https],
+        ] {
+            let ml_proto = ml.clone().filter(None, true, true, true, &proto);
+            assert!(ml_proto.mirrors.len() < cur_len);
+            assert!(!ml_proto.mirrors.is_empty());
+            assert!(ml_proto.mirrors.iter().all(|m| proto.contains(&m.protocol)));
+        }
+
+        ml = ml.filter(None, true, true, true, &[]);
         assert!(ml
             .mirrors
             .iter()
             .all(|m| m.isos.unwrap_or(false) & m.ipv4.unwrap_or(false) & m.ipv6.unwrap_or(false)));
         assert!(ml.mirrors.len() < cur_len);
-        assert!(ml.mirrors.len() > 0);
+        assert!(!ml.mirrors.is_empty());
     }
 }
