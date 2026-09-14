@@ -81,7 +81,7 @@ impl MirrorList {
         let mut mlist: Self = match serde_json::from_str(&body) {
             Ok(x) => x,
             Err(e) => {
-                eprintln!("malformed JSON: {}", &body);
+                eprintln!("malformed JSON: {}", body);
                 return Err(e.into());
             }
         };
